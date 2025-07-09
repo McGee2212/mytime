@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📚 Hausaufgaben-Organizer</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(to right, #6dd5ed, #2193b0);
+      color: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    .container {
+      background: white;
+      border-radius: 1rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      max-width: 500px;
+      width: 100%;
+      padding: 2rem;
+    }
+    h1 {
+      text-align: center;
+      color: #2193b0;
+    }
+    form input, form button {
+      display: block;
+      width: 100%;
+      margin: 0.75rem 0;
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+    }
+    form button {
+      background: #2193b0;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    form button:hover {
+      background: #176b8a;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      background: #f0f4f8;
+      border-left: 6px solid #2193b0;
+      border-radius: 0.5rem;
+    }
+    .urgent {
+      border-color: red;
+      background: #ffe0e0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container" id="loginContainer">
+    <h1>🔐 Login</h1>
+    <form onsubmit="return checkPassword(event)">
+      <input type="password" id="password" placeholder="Passwort" required />
+      <button type="submit">Einloggen</button>
+    </form>
+  </div>
+
+  <div class="container" id="mainContainer" style="display: none;">
+    <h1>📚 Hausaufgaben</h1>
+    <form id="taskForm">
+      <input type="text" id="subject" placeholder="Fach" required />
+      <input type="text" id="description" placeholder="Beschreibung" required />
+      <input type="datetime-local" id="dueDate" required />
+      <button type="submit">➕ Hinzufügen</button>
+    </form>
+    <ul id="taskList"></ul>
+  </div>
+
+  <script>
+    const CORRECT_PASSWORD = "deinpasswort123"; // <- Hier dein Passwort setzen
+
+    function checkPassword(event) {
+      event.preventDefault();
+      const input = document.getElementById('password').value;
+      if (input === CORRECT_PASSWORD) {
+        document.getElementById('loginContainer').style.display = 'none';
+        document.getElementById('mainContainer').style.display = 'block';
+      } else {
+        alert("❌ Falsches Passwort");
+      }
+    }
+
+    const taskForm = document.getElementById('taskForm');
+    const taskList = document.getElementById('taskList');
+    const tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+    renderTasks();
+
+    taskForm?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const subject = document.getElementById('subject').value;
+      const description = document.getElementById('description').value;
+      const dueDate = document.getElementById('dueDate').value;
+      const task = { subject, description, dueDate };
+      tasks.push(task);
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+      renderTasks();
+      taskForm.reset();
+    });
+
+    function renderTasks() {
+      taskList.innerHTML = '';
+      const now = new Date();
+      tasks.forEach(task => {
+        const due = new Date(task.dueDate);
+        const diff = due - now;
+        const li = document.createElement('li');
+        const hoursLeft = Math.floor(diff / (1000 * 60 * 60));
+        const minsLeft = Math.floor((diff / (1000 * 60)) % 60);
+        const rest = `(in ${hoursLeft}h ${minsLeft}min)`;
+        li.textContent = `${task.subject}: ${task.description} ${rest}`;
+
+        if (due.toDateString() === now.toDateString()) {
+          li.classList.add('urgent');
+        }
+
+        taskList.appendChild(li);
+      });
+    }
+  </script>
+</body>
+
+</html>
