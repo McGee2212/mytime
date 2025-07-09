@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="de">
 
@@ -72,37 +73,46 @@
     .delete-btn:hover {
       background: #dc2626;
     }
+
+    .notification-status {
+      text-align: center;
+      padding: 1rem;
+      margin: 1rem auto;
+      max-width: 600px;
+      border-radius: 0.5rem;
+      font-weight: bold;
+    }
+
+    .status-granted {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .status-denied {
+      background: #fee2e2;
+      color: #991b1b;
+    }
   </style>
 </head>
 
 <body>
   <h1>📚 Hausaufgaben-Organizer</h1>
+  
+  <div id="notificationStatus" class="notification-status"></div>
+  
   <form id="taskForm">
     <input type="text" id="subject" placeholder="Fach" required />
     <input type="text" id="description" placeholder="Beschreibung" required />
     <input type="datetime-local" id="dueDate" required />
     <button type="submit">➕ Hinzufügen</button>
   </form>
+  
   <ul id="taskList"></ul>
+  
   <button onclick="testNoti()">🔔 Test-Benachrichtigung</button>
+  <button onclick="enableNotifications()">🔓 Benachrichtigungen aktivieren</button>
 
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
   <script>
-    // Firebase Konfiguration
-    const firebaseConfig = {
-      apiKey: "AIzaSyB33LGC5T6JmmhyRTvZt_ve6Vm-_thB0vE",
-      authDomain: "all-shit-for-my-dream.firebaseapp.com",
-      projectId: "all-shit-for-my-dream",
-      storageBucket: "all-shit-for-my-dream.appspot.com",
-      messagingSenderId: "559865883468",
-      appId: "1:559865883468:web:aeb1677d8e8b6884d63de9"
-    };
-    
-    // Firebase initialisieren
-    firebase.initializeApp(firebaseConfig);
-    const messaging = firebase.messaging();
-
     // Service Worker registrieren
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js')
@@ -112,21 +122,13 @@
         .catch((error) => {
           console.log('❌ Service Worker Registrierung fehlgeschlagen:', error);
         });
-      
-      navigator.serviceWorker.register('firebase-messaging-sw.js')
-        .then((registration) => {
-          console.log('✅ Firebase Service Worker registriert');
-          messaging.useServiceWorker(registration);
-        })
-        .catch((error) => {
-          console.log('❌ Firebase Service Worker Registrierung fehlgeschlagen:', error);
-        });
     }
 
     // Benachrichtigungserlaubnis anfragen
     async function requestNotificationPermission() {
       if (!("Notification" in window)) {
         console.log("❌ Dieser Browser unterstützt keine Benachrichtigungen");
+        updateNotificationStatus("❌ Benachrichtigungen nicht unterstützt", false);
         return false;
       }
 
@@ -137,39 +139,43 @@
       }
       
       if (permission === "granted") {
-        console.log("🔓 Benachrichtigungen erlaubt");
-        try {
-          const vapidKey = "BFe49nmPNEmtVQgQc53ID5pv2t5dLugcXDtkhyVBr28zGO2GaGsQVRgZjlUdNu3udujLu_45SAG7r_bJntyOF1U";
-          const token = await messaging.getToken({vapidKey: vapidKey});
-          console.log("📬 Token erhalten:", token);
-        } catch (error) {
-          console.log("❌ Token-Fehler:", error);
-        }
+        console.log("✅ Benachrichtigungen erlaubt");
+        updateNotificationStatus("✅ Benachrichtigungen sind aktiviert", true);
         return true;
       } else {
         console.log("❌ Benachrichtigungen wurden abgelehnt");
+        updateNotificationStatus("❌ Benachrichtigungen sind deaktiviert", false);
         return false;
+      }
+    }
+
+    // Benachrichtigungsstatus anzeigen
+    function updateNotificationStatus(message, granted) {
+      const statusDiv = document.getElementById('notificationStatus');
+      statusDiv.textContent = message;
+      statusDiv.className = `notification-status ${granted ? 'status-granted' : 'status-denied'}`;
+    }
+
+    // Benachrichtigungen manuell aktivieren
+    async function enableNotifications() {
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        new Notification("🎉 Benachrichtigungen aktiviert!", {
+          body: "Sie erhalten jetzt Erinnerungen für Ihre Aufgaben",
+          icon: "icon-192.png"
+        });
       }
     }
 
     // Test-Benachrichtigung
     function testNoti() {
       if (Notification.permission === "granted") {
-        new Notification("Test ✅", {
-          body: "Dies ist eine Test-Benachrichtigung", 
+        new Notification("🧪 Test erfolgreich", {
+          body: "Benachrichtigungen funktionieren korrekt!", 
           icon: "icon-192.png"
         });
       } else {
-        requestNotificationPermission().then((granted) => {
-          if (granted) {
-            new Notification("Test ✅", {
-              body: "Dies ist eine Test-Benachrichtigung", 
-              icon: "icon-192.png"
-            });
-          } else {
-            alert("Benachrichtigungen sind nicht erlaubt. Bitte aktivieren Sie sie in den Browser-Einstellungen.");
-          }
-        });
+        enableNotifications();
       }
     }
 
@@ -188,15 +194,35 @@
         return;
       }
 
+      // Tasks nach Datum sortieren
+      tasks.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
       tasks.forEach((task, index) => {
         const li = document.createElement('li');
         const dueDate = new Date(task.dueDate);
+        const now = new Date();
+        const daysDiff = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+        
+        let dateColor = '#059669';
+        let urgencyText = '';
+        
+        if (daysDiff < 0) {
+          dateColor = '#dc2626';
+          urgencyText = ' (ÜBERFÄLLIG!)';
+        } else if (daysDiff === 0) {
+          dateColor = '#f59e0b';
+          urgencyText = ' (HEUTE!)';
+        } else if (daysDiff === 1) {
+          dateColor = '#f59e0b';
+          urgencyText = ' (MORGEN!)';
+        }
+        
         const formattedDate = dueDate.toLocaleString('de-DE');
         
         li.innerHTML = `
           <div class="task-subject">${task.subject}</div>
           <div class="task-description">${task.description}</div>
-          <div class="task-date">📅 Fällig: ${formattedDate}</div>
+          <div class="task-date" style="color: ${dateColor}">📅 Fällig: ${formattedDate}${urgencyText}</div>
           <button class="delete-btn" onclick="deleteTask(${index})">🗑️ Löschen</button>
         `;
         taskList.appendChild(li);
@@ -209,6 +235,50 @@
       localStorage.setItem('tasks', JSON.stringify(tasks));
       renderTasks();
       console.log('🗑️ Task gelöscht, verbleibende Tasks:', tasks);
+    }
+
+    // Erinnerungen prüfen
+    function checkReminders() {
+      if (Notification.permission !== "granted") {
+        return;
+      }
+
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      tasks.forEach(task => {
+        const dueDate = new Date(task.dueDate);
+        const taskDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+        
+        // Prüfen ob heute fällig
+        if (taskDate.getTime() === today.getTime()) {
+          // Nur einmal am Tag benachrichtigen
+          const notifiedToday = localStorage.getItem(`notified_today_${task.created}`);
+          if (!notifiedToday || notifiedToday !== today.toDateString()) {
+            new Notification("⚠️ HEUTE FÄLLIG!", {
+              body: `${task.subject}: ${task.description}`,
+              icon: "icon-192.png",
+              tag: `today_${task.created}`
+            });
+            localStorage.setItem(`notified_today_${task.created}`, today.toDateString());
+          }
+        }
+        
+        // Prüfen ob morgen fällig
+        if (taskDate.getTime() === tomorrow.getTime()) {
+          const notifiedTomorrow = localStorage.getItem(`notified_tomorrow_${task.created}`);
+          if (!notifiedTomorrow || notifiedTomorrow !== today.toDateString()) {
+            new Notification("📅 MORGEN FÄLLIG!", {
+              body: `${task.subject}: ${task.description}`,
+              icon: "icon-192.png",
+              tag: `tomorrow_${task.created}`
+            });
+            localStorage.setItem(`notified_tomorrow_${task.created}`, today.toDateString());
+          }
+        }
+      });
     }
 
     // Neue Task hinzufügen
@@ -230,7 +300,6 @@
         tasks.push(task);
         localStorage.setItem('tasks', JSON.stringify(tasks));
         console.log('✅ Task hinzugefügt:', task);
-        console.log('📋 Alle Tasks:', tasks);
         
         renderTasks();
         taskForm.reset();
@@ -245,12 +314,31 @@
       }
     });
 
-    // Benachrichtigungen beim Laden anfragen und Tasks anzeigen
-    requestNotificationPermission();
-    renderTasks();
+    // Initialisierung
+    async function init() {
+      await requestNotificationPermission();
+      renderTasks();
+      checkReminders();
+      
+      // Erinnerungen alle 30 Minuten prüfen
+      setInterval(checkReminders, 30 * 60 * 1000);
+      
+      // Erinnerungen auch bei Seitenaktivierung prüfen
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          checkReminders();
+          renderTasks();
+        }
+      });
+    }
 
-    // Global verfügbar machen für onclick
+    // Global verfügbar machen
     window.deleteTask = deleteTask;
+    window.testNoti = testNoti;
+    window.enableNotifications = enableNotifications;
+
+    // App starten
+    init();
   </script>
 </body>
 
