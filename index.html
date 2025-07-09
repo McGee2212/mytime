@@ -52,8 +52,8 @@
   <ul id="taskList"></ul>
   <button onclick="testNoti()">🔔 Test-Benachrichtigung</button>
 
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyB33LGC5T6JmmhyRTvZt_ve6Vm-_thB0vE",
@@ -135,27 +135,60 @@
 
     const taskForm = document.getElementById('taskForm');
     const taskList = document.getElementById('taskList');
-    const tasks = JSON.parse(localStorage.getItem('tasks')) || [];
-    renderTasks();
+    let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+    
+    function renderTasks() {
+      taskList.innerHTML = '';
+      console.log('📋 Rendering tasks:', tasks);
+      tasks.forEach((task, index) => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <strong>${task.subject}</strong> – ${task.description} 
+          <br>📅 Fällig: ${new Date(task.dueDate).toLocaleString('de-DE')}
+          <button onclick="deleteTask(${index})" style="margin-left: 10px; background: red; color: white; border: none; padding: 5px;">🗑️ Löschen</button>
+        `;
+        taskList.appendChild(li);
+      });
+    }
+    
+    function deleteTask(index) {
+      tasks.splice(index, 1);
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+      renderTasks();
+    }
+    
     taskForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const subject = document.getElementById('subject').value;
       const description = document.getElementById('description').value;
       const dueDate = document.getElementById('dueDate').value;
-      const task = {subject, description, dueDate};
-      tasks.push(task);
-      localStorage.setItem('tasks', JSON.stringify(tasks));
-      renderTasks();
-      taskForm.reset();
+      
+      if (subject && description && dueDate) {
+        const task = {
+          subject: subject,
+          description: description,
+          dueDate: dueDate,
+          created: new Date().toISOString()
+        };
+        tasks.push(task);
+        localStorage.setItem('tasks', JSON.stringify(tasks));
+        console.log('✅ Task hinzugefügt:', task);
+        console.log('📋 Alle Tasks:', tasks);
+        renderTasks();
+        taskForm.reset();
+        
+        // Test-Benachrichtigung für neue Aufgabe
+        if (Notification.permission === "granted") {
+          new Notification("📚 Neue Aufgabe hinzugefügt", {
+            body: `${subject}: ${description}`,
+            icon: "icon-192.png"
+          });
+        }
+      }
     });
-    function renderTasks() {
-      taskList.innerHTML = '';
-      tasks.forEach((task) => {
-        const li = document.createElement('li');
-        li.textContent = `${task.subject} – ${task.description} (fällig: ${new Date(task.dueDate).toLocaleString()})`;
-        taskList.appendChild(li);
-      });
-    }
+    
+    // Tasks beim Laden der Seite anzeigen
+    renderTasks();
   </script>
 </body>
 
