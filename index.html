@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="de">
 
@@ -92,25 +91,57 @@
       background: #fee2e2;
       color: #991b1b;
     }
+
+    .controls {
+      max-width: 600px;
+      margin: 1rem auto;
+      text-align: center;
+    }
+
+    .controls button {
+      width: auto;
+      margin: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .controls button:hover {
+      background: #2563eb;
+    }
+
+    .test-btn {
+      background: #f59e0b !important;
+    }
+
+    .test-btn:hover {
+      background: #d97706 !important;
+    }
   </style>
 </head>
 
 <body>
   <h1>📚 Hausaufgaben-Organizer</h1>
-  
+
   <div id="notificationStatus" class="notification-status"></div>
-  
+
   <form id="taskForm">
     <input type="text" id="subject" placeholder="Fach" required />
     <input type="text" id="description" placeholder="Beschreibung" required />
     <input type="datetime-local" id="dueDate" required />
     <button type="submit">➕ Hinzufügen</button>
   </form>
-  
+
   <ul id="taskList"></ul>
-  
-  <button onclick="testNoti()">🔔 Test-Benachrichtigung</button>
-  <button onclick="enableNotifications()">🔓 Benachrichtigungen aktivieren</button>
+
+  <div class="controls">
+    <button class="test-btn" onclick="testNoti()">🔔 Test-Benachrichtigung</button>
+    <button onclick="enableNotifications()">🔓 Benachrichtigungen aktivieren</button>
+  </div>
 
   <script>
     // Service Worker registrieren
@@ -132,19 +163,33 @@
         return false;
       }
 
-      let permission = Notification.permission;
-      
-      if (permission === "default") {
-        permission = await Notification.requestPermission();
-      }
-      
-      if (permission === "granted") {
-        console.log("✅ Benachrichtigungen erlaubt");
-        updateNotificationStatus("✅ Benachrichtigungen sind aktiviert", true);
+      console.log("🔔 Aktuelle Berechtigung:", Notification.permission);
+
+      if (Notification.permission === "granted") {
+        updateNotificationStatus("✅ Benachrichtigungen sind bereits aktiviert", true);
         return true;
-      } else {
-        console.log("❌ Benachrichtigungen wurden abgelehnt");
-        updateNotificationStatus("❌ Benachrichtigungen sind deaktiviert", false);
+      }
+
+      if (Notification.permission === "denied") {
+        updateNotificationStatus("❌ Benachrichtigungen wurden blockiert. Bitte in den Browsereinstellungen aktivieren.", false);
+        return false;
+      }
+
+      // Berechtigung anfragen
+      try {
+        const permission = await Notification.requestPermission();
+        console.log("🔔 Neue Berechtigung:", permission);
+
+        if (permission === "granted") {
+          updateNotificationStatus("✅ Benachrichtigungen sind jetzt aktiviert", true);
+          return true;
+        } else {
+          updateNotificationStatus("❌ Benachrichtigungen wurden abgelehnt", false);
+          return false;
+        }
+      } catch (error) {
+        console.log("❌ Fehler beim Anfordern der Berechtigung:", error);
+        updateNotificationStatus("❌ Fehler beim Aktivieren der Benachrichtigungen", false);
         return false;
       }
     }
@@ -158,24 +203,33 @@
 
     // Benachrichtigungen manuell aktivieren
     async function enableNotifications() {
+      console.log("🔓 Benachrichtigungen aktivieren wurde geklickt");
       const granted = await requestNotificationPermission();
       if (granted) {
-        new Notification("🎉 Benachrichtigungen aktiviert!", {
-          body: "Sie erhalten jetzt Erinnerungen für Ihre Aufgaben",
-          icon: "icon-192.png"
-        });
+        // Test-Benachrichtigung senden
+        setTimeout(() => {
+          new Notification("🎉 Benachrichtigungen aktiviert!", {
+            body: "Sie erhalten jetzt Erinnerungen für Ihre Aufgaben",
+            icon: "icon-192.png"
+          });
+        }, 500);
       }
     }
 
     // Test-Benachrichtigung
     function testNoti() {
+      console.log("🧪 Test-Benachrichtigung wurde geklickt");
+      console.log("🔔 Aktuelle Berechtigung:", Notification.permission);
+
       if (Notification.permission === "granted") {
         new Notification("🧪 Test erfolgreich", {
-          body: "Benachrichtigungen funktionieren korrekt!", 
+          body: "Benachrichtigungen funktionieren korrekt!",
           icon: "icon-192.png"
         });
+        console.log("✅ Test-Benachrichtigung gesendet");
       } else {
-        enableNotifications();
+        console.log("❌ Keine Berechtigung für Benachrichtigungen");
+        alert("⚠️ Bitte zuerst 'Benachrichtigungen aktivieren' klicken!");
       }
     }
 
@@ -188,7 +242,7 @@
     function renderTasks() {
       taskList.innerHTML = '';
       console.log('📋 Rendering tasks:', tasks);
-      
+
       if (tasks.length === 0) {
         taskList.innerHTML = '<li style="text-align: center; color: #6b7280;">Keine Aufgaben vorhanden</li>';
         return;
@@ -202,10 +256,10 @@
         const dueDate = new Date(task.dueDate);
         const now = new Date();
         const daysDiff = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
-        
+
         let dateColor = '#059669';
         let urgencyText = '';
-        
+
         if (daysDiff < 0) {
           dateColor = '#dc2626';
           urgencyText = ' (ÜBERFÄLLIG!)';
@@ -216,9 +270,9 @@
           dateColor = '#f59e0b';
           urgencyText = ' (MORGEN!)';
         }
-        
+
         const formattedDate = dueDate.toLocaleString('de-DE');
-        
+
         li.innerHTML = `
           <div class="task-subject">${task.subject}</div>
           <div class="task-description">${task.description}</div>
@@ -240,6 +294,7 @@
     // Erinnerungen prüfen
     function checkReminders() {
       if (Notification.permission !== "granted") {
+        console.log("❌ Keine Berechtigung für Erinnerungen");
         return;
       }
 
@@ -248,15 +303,17 @@
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
+      console.log("🔍 Prüfe Erinnerungen für", tasks.length, "Tasks");
+
       tasks.forEach(task => {
         const dueDate = new Date(task.dueDate);
         const taskDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-        
+
         // Prüfen ob heute fällig
         if (taskDate.getTime() === today.getTime()) {
-          // Nur einmal am Tag benachrichtigen
           const notifiedToday = localStorage.getItem(`notified_today_${task.created}`);
           if (!notifiedToday || notifiedToday !== today.toDateString()) {
+            console.log("🚨 Sende HEUTE-Erinnerung für:", task.subject);
             new Notification("⚠️ HEUTE FÄLLIG!", {
               body: `${task.subject}: ${task.description}`,
               icon: "icon-192.png",
@@ -265,11 +322,12 @@
             localStorage.setItem(`notified_today_${task.created}`, today.toDateString());
           }
         }
-        
+
         // Prüfen ob morgen fällig
         if (taskDate.getTime() === tomorrow.getTime()) {
           const notifiedTomorrow = localStorage.getItem(`notified_tomorrow_${task.created}`);
           if (!notifiedTomorrow || notifiedTomorrow !== today.toDateString()) {
+            console.log("📅 Sende MORGEN-Erinnerung für:", task.subject);
             new Notification("📅 MORGEN FÄLLIG!", {
               body: `${task.subject}: ${task.description}`,
               icon: "icon-192.png",
@@ -284,11 +342,11 @@
     // Neue Task hinzufügen
     taskForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      
+
       const subject = document.getElementById('subject').value.trim();
       const description = document.getElementById('description').value.trim();
       const dueDate = document.getElementById('dueDate').value;
-      
+
       if (subject && description && dueDate) {
         const task = {
           subject: subject,
@@ -296,14 +354,14 @@
           dueDate: dueDate,
           created: new Date().toISOString()
         };
-        
+
         tasks.push(task);
         localStorage.setItem('tasks', JSON.stringify(tasks));
         console.log('✅ Task hinzugefügt:', task);
-        
+
         renderTasks();
         taskForm.reset();
-        
+
         // Benachrichtigung für neue Aufgabe
         if (Notification.permission === "granted") {
           new Notification("📚 Neue Aufgabe hinzugefügt", {
@@ -311,21 +369,38 @@
             icon: "icon-192.png"
           });
         }
+
+        // Sofort Erinnerungen prüfen
+        setTimeout(checkReminders, 1000);
       }
     });
 
     // Initialisierung
     async function init() {
-      await requestNotificationPermission();
+      console.log("🚀 App wird initialisiert");
+
+      // Status checken ohne automatisch zu fragen
+      if (Notification.permission === "granted") {
+        updateNotificationStatus("✅ Benachrichtigungen sind aktiviert", true);
+      } else if (Notification.permission === "denied") {
+        updateNotificationStatus("❌ Benachrichtigungen wurden blockiert. Bitte in den Browsereinstellungen aktivieren.", false);
+      } else {
+        updateNotificationStatus("🔔 Klicken Sie auf 'Benachrichtigungen aktivieren' um Erinnerungen zu erhalten", false);
+      }
+
       renderTasks();
-      checkReminders();
-      
-      // Erinnerungen alle 30 Minuten prüfen
-      setInterval(checkReminders, 30 * 60 * 1000);
-      
+
+      // Nur prüfen wenn bereits erlaubt
+      if (Notification.permission === "granted") {
+        checkReminders();
+
+        // Erinnerungen alle 30 Minuten prüfen
+        setInterval(checkReminders, 30 * 60 * 1000);
+      }
+
       // Erinnerungen auch bei Seitenaktivierung prüfen
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
+        if (!document.hidden && Notification.permission === "granted") {
           checkReminders();
           renderTasks();
         }
