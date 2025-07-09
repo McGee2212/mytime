@@ -1,5 +1,6 @@
-importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js');
+importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
+
 firebase.initializeApp({
   apiKey: "AIzaSyB33LGC5T6JmmhyRTvZt_ve6Vm-_thB0vE",
   authDomain: "all-shit-for-my-dream.firebaseapp.com",
@@ -8,7 +9,9 @@ firebase.initializeApp({
   messagingSenderId: "559865883468",
   appId: "1:559865883468:web:aeb1677d8e8b6884d63de9"
 });
+
 const messaging = firebase.messaging();
+
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Nachricht empfangen: ', payload);
   const notificationTitle = payload.notification.title;

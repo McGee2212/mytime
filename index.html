@@ -37,6 +37,40 @@
 
     li {
       margin: 0.5rem 0;
+      padding: 1rem;
+      background: #f9f9f9;
+      border-radius: 0.5rem;
+      border-left: 4px solid #3b82f6;
+    }
+
+    .task-subject {
+      font-weight: bold;
+      color: #1f2937;
+    }
+
+    .task-description {
+      color: #6b7280;
+      margin: 0.25rem 0;
+    }
+
+    .task-date {
+      color: #059669;
+      font-size: 0.9rem;
+    }
+
+    .delete-btn {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      width: auto;
+    }
+
+    .delete-btn:hover {
+      background: #dc2626;
     }
   </style>
 </head>
@@ -52,9 +86,10 @@
   <ul id="taskList"></ul>
   <button onclick="testNoti()">🔔 Test-Benachrichtigung</button>
 
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
   <script>
+    // Firebase Konfiguration
     const firebaseConfig = {
       apiKey: "AIzaSyB33LGC5T6JmmhyRTvZt_ve6Vm-_thB0vE",
       authDomain: "all-shit-for-my-dream.firebaseapp.com",
@@ -63,9 +98,12 @@
       messagingSenderId: "559865883468",
       appId: "1:559865883468:web:aeb1677d8e8b6884d63de9"
     };
+    
+    // Firebase initialisieren
     firebase.initializeApp(firebaseConfig);
     const messaging = firebase.messaging();
 
+    // Service Worker registrieren
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js')
         .then((registration) => {
@@ -85,6 +123,7 @@
         });
     }
 
+    // Benachrichtigungserlaubnis anfragen
     async function requestNotificationPermission() {
       if (!("Notification" in window)) {
         console.log("❌ Dieser Browser unterstützt keine Benachrichtigungen");
@@ -99,10 +138,13 @@
       
       if (permission === "granted") {
         console.log("🔓 Benachrichtigungen erlaubt");
-        const vapidKey = "BFe49nmPNEmtVQgQc53ID5pv2t5dLugcXDtkhyVBr28zGO2GaGsQVRgZjlUdNu3udujLu_45SAG7r_bJntyOF1U";
-        messaging.getToken({vapidKey: vapidKey}).then((token) => {
+        try {
+          const vapidKey = "BFe49nmPNEmtVQgQc53ID5pv2t5dLugcXDtkhyVBr28zGO2GaGsQVRgZjlUdNu3udujLu_45SAG7r_bJntyOF1U";
+          const token = await messaging.getToken({vapidKey: vapidKey});
           console.log("📬 Token erhalten:", token);
-        });
+        } catch (error) {
+          console.log("❌ Token-Fehler:", error);
+        }
         return true;
       } else {
         console.log("❌ Benachrichtigungen wurden abgelehnt");
@@ -110,6 +152,7 @@
       }
     }
 
+    // Test-Benachrichtigung
     function testNoti() {
       if (Notification.permission === "granted") {
         new Notification("Test ✅", {
@@ -130,32 +173,84 @@
       }
     }
 
-    // Benachrichtigungen beim Laden der Seite anfragen
-    requestNotificationPermission();
-
+    // Task-Verwaltung
     const taskForm = document.getElementById('taskForm');
     const taskList = document.getElementById('taskList');
-    const tasks = JSON.parse(localStorage.getItem('tasks')) || [];
-    renderTasks();
-    taskForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const subject = document.getElementById('subject').value;
-      const description = document.getElementById('description').value;
-      const dueDate = document.getElementById('dueDate').value;
-      const task = {subject, description, dueDate};
-      tasks.push(task);
-      localStorage.setItem('tasks', JSON.stringify(tasks));
-      renderTasks();
-      taskForm.reset();
-    });
+    let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+
+    // Tasks anzeigen
     function renderTasks() {
       taskList.innerHTML = '';
-      tasks.forEach((task) => {
+      console.log('📋 Rendering tasks:', tasks);
+      
+      if (tasks.length === 0) {
+        taskList.innerHTML = '<li style="text-align: center; color: #6b7280;">Keine Aufgaben vorhanden</li>';
+        return;
+      }
+
+      tasks.forEach((task, index) => {
         const li = document.createElement('li');
-        li.textContent = `${task.subject} – ${task.description} (fällig: ${new Date(task.dueDate).toLocaleString()})`;
+        const dueDate = new Date(task.dueDate);
+        const formattedDate = dueDate.toLocaleString('de-DE');
+        
+        li.innerHTML = `
+          <div class="task-subject">${task.subject}</div>
+          <div class="task-description">${task.description}</div>
+          <div class="task-date">📅 Fällig: ${formattedDate}</div>
+          <button class="delete-btn" onclick="deleteTask(${index})">🗑️ Löschen</button>
+        `;
         taskList.appendChild(li);
       });
     }
+
+    // Task löschen
+    function deleteTask(index) {
+      tasks.splice(index, 1);
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+      renderTasks();
+      console.log('🗑️ Task gelöscht, verbleibende Tasks:', tasks);
+    }
+
+    // Neue Task hinzufügen
+    taskForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      const subject = document.getElementById('subject').value.trim();
+      const description = document.getElementById('description').value.trim();
+      const dueDate = document.getElementById('dueDate').value;
+      
+      if (subject && description && dueDate) {
+        const task = {
+          subject: subject,
+          description: description,
+          dueDate: dueDate,
+          created: new Date().toISOString()
+        };
+        
+        tasks.push(task);
+        localStorage.setItem('tasks', JSON.stringify(tasks));
+        console.log('✅ Task hinzugefügt:', task);
+        console.log('📋 Alle Tasks:', tasks);
+        
+        renderTasks();
+        taskForm.reset();
+        
+        // Benachrichtigung für neue Aufgabe
+        if (Notification.permission === "granted") {
+          new Notification("📚 Neue Aufgabe hinzugefügt", {
+            body: `${subject}: ${description}`,
+            icon: "icon-192.png"
+          });
+        }
+      }
+    });
+
+    // Benachrichtigungen beim Laden anfragen und Tasks anzeigen
+    requestNotificationPermission();
+    renderTasks();
+
+    // Global verfügbar machen für onclick
+    window.deleteTask = deleteTask;
   </script>
 </body>
 
